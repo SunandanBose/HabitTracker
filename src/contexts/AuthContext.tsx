@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { GoogleOAuthProvider } from '@react-oauth/google';
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { GOOGLE_CLIENT_ID, GOOGLE_DISCOVERY_DOCS, GOOGLE_SCOPES } from '../config/googleAuth';
 import { jwtDecode } from 'jwt-decode';
 
@@ -17,50 +17,57 @@ interface AuthContextType {
   openGoogleDrive: () => void;
   handleGoogleLoginSuccess: (credentialResponse: any) => void;
   isGoogleApiLoaded: boolean;
+  getAccessToken: () => Promise<string | null>;
+  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Inner component that uses the Google OAuth hooks
+const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isGoogleApiLoaded, setIsGoogleApiLoaded] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Initialize Google API client when authenticated
-  useEffect(() => {
-    if (isAuthenticated && !isGoogleApiLoaded && !isInitializing) {
-      initGoogleApiClient();
-    }
-  }, [isAuthenticated, isGoogleApiLoaded, isInitializing]);
-
-  const initGoogleApiClient = async () => {
-    if (isInitializing) return;
-    setIsInitializing(true);
-
-    try {
-      // Load the Google API client
-      await new Promise<void>((resolve, reject) => {
-        window.gapi.load('client', {
-          callback: resolve,
-          onerror: reject
-        });
-      });
-
-      // Initialize the client
-      await window.gapi.client.init({
-        clientId: GOOGLE_CLIENT_ID,
-        discoveryDocs: GOOGLE_DISCOVERY_DOCS,
-        scope: GOOGLE_SCOPES,
-      });
-
-      console.log('Google API client initialized successfully');
+  // Use the Google login hook from @react-oauth/google
+  const login = useGoogleLogin({
+    onSuccess: (tokenResponse) => {
+      console.log('Google login success:', tokenResponse);
+      setAccessToken(tokenResponse.access_token);
       setIsGoogleApiLoaded(true);
-    } catch (error) {
-      console.error('Error initializing Google API client:', error);
-    } finally {
-      setIsInitializing(false);
+      setError(null);
+    },
+    onError: (error) => {
+      console.error('Google login error:', error);
+      setError('Failed to get access token. Please check your Google OAuth configuration.');
+      setIsGoogleApiLoaded(false);
+    },
+    scope: GOOGLE_SCOPES,
+  });
+
+  // Function to get the current access token
+  const getAccessToken = async (): Promise<string | null> => {
+    if (accessToken) {
+      return accessToken;
     }
+    
+    // If we don't have an access token but the user is authenticated,
+    // we can try to get a new one
+    if (isAuthenticated) {
+      try {
+        // This will trigger the Google login flow if needed
+        await login();
+        return accessToken;
+      } catch (error) {
+        console.error('Error getting access token:', error);
+        setError('Failed to get access token. Please try again.');
+        return null;
+      }
+    }
+    
+    return null;
   };
 
   const handleGoogleLoginSuccess = (credentialResponse: any) => {
@@ -81,6 +88,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUser(userProfile);
       setIsAuthenticated(true);
+      setError(null);
+      
+      // After successful authentication, get an access token for Google Drive
+      login();
     } catch (error) {
       console.error("Error decoding JWT: ", error);
       // Fallback if decoding fails
@@ -91,6 +102,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         credential: credentialResponse.credential 
       });
       setIsAuthenticated(true);
+      setError(null);
+      
+      // After successful authentication, get an access token for Google Drive
+      login();
     }
   };
 
@@ -99,6 +114,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setIsAuthenticated(false);
     setIsGoogleApiLoaded(false);
+    setAccessToken(null);
+    setError(null);
   };
 
   const openGoogleDrive = () => {
@@ -106,19 +123,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        signOut,
+        openGoogleDrive,
+        handleGoogleLoginSuccess,
+        isGoogleApiLoaded,
+        getAccessToken,
+        error,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Outer component that provides the GoogleOAuthProvider
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthContext.Provider
-        value={{
-          user,
-          isAuthenticated,
-          signOut,
-          openGoogleDrive,
-          handleGoogleLoginSuccess,
-          isGoogleApiLoaded,
-        }}
-      >
+      <AuthProviderInner>
         {children}
-      </AuthContext.Provider>
+      </AuthProviderInner>
     </GoogleOAuthProvider>
   );
 };

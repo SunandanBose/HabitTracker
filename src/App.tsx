@@ -8,6 +8,7 @@ import LoginPage from './components/LoginPage';
 import Header from './components/Header';
 import DailyTracker from './components/DailyTracker';
 import MonthlyTracker from './components/MonthlyTracker';
+import GoogleLogin from './components/GoogleLogin';
 
 const theme = createTheme({
   palette: {
@@ -21,13 +22,19 @@ const theme = createTheme({
 });
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, isGoogleApiLoaded } = useAuth();
+  const { isAuthenticated, isGoogleApiLoaded, user, handleGoogleLoginSuccess, signOut, error: authError } = useAuth();
   const [data, setData] = useState<any[]>([]);
   const [customColumns, setCustomColumns] = useState<string[]>([]);
   const [fileId, setFileId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   useEffect(() => {
     if (isAuthenticated && isGoogleApiLoaded) {
@@ -69,6 +76,7 @@ const AppContent: React.FC = () => {
   const handleSave = async () => {
     if (!isGoogleApiLoaded) {
       console.error('Google API not loaded');
+      setError('Google API not loaded. Please check your Google OAuth configuration.');
       return;
     }
     
@@ -110,6 +118,17 @@ const AppContent: React.FC = () => {
         <Typography variant="body1">
           Please try refreshing the page or signing out and back in.
         </Typography>
+        <Typography variant="body1">
+          If you're seeing this error, please make sure your Google OAuth client ID is configured correctly:
+        </Typography>
+        <ol>
+          <li>Go to the Google Cloud Console: https://console.cloud.google.com/</li>
+          <li>Select your project</li>
+          <li>Go to "APIs &amp; Services" &gt; "Credentials"</li>
+          <li>Find your OAuth 2.0 Client ID and click on it to edit</li>
+          <li>Under "Authorized JavaScript origins", add: http://localhost:3000</li>
+          <li>Click "Save"</li>
+        </ol>
       </Box>
     );
   }
