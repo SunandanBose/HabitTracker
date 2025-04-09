@@ -26,7 +26,16 @@
     -->
     <script src="https://apis.google.com/js/api.js"></script>
     <title>Habit Tracker</title>
-  </head>
+  
+<script>
+  // Clear localStorage on page load for debugging
+  console.log("Clearing localStorage for debugging...");
+  localStorage.clear();
+  // Add extra debug info
+  window.HT_DEBUG = true;
+  console.log("Debug mode enabled");
+</script>
+</head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>

@@ -33,7 +33,12 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "clean-test": "rimraf coverage && npm test -- --coverage",
+    "reset": "node scripts/reset-app.js",
+    "get-token": "node scripts/get-token.js",
+    "test-drive": "node scripts/test-drive-access.js --verbose",
+    "verify-config": "node scripts/verify-config.js"
   },
   "eslintConfig": {
     "extends": [
@@ -52,5 +57,12 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "google-auth-library": "^9.15.1",
+    "node-fetch": "^2.7.0",
+    "open": "^10.1.0"
   }
 }

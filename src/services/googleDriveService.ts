@@ -1,5 +1,4 @@
 import { GOOGLE_DISCOVERY_DOCS, GOOGLE_SCOPES, HABIT_TRACKER_FOLDER_NAME, DATA_FILE_NAME } from '../config/googleAuth';
-import { useAuth } from '../contexts/AuthContext';
 
 interface HabitData {
   dailyTracker: any[];
@@ -23,13 +22,17 @@ interface GoogleDriveFileMetadata {
 }
 
 class GoogleDriveService {
+  private accessToken: string | null = null;
+  
+  setAccessToken(token: string) {
+    this.accessToken = token;
+  }
+
   private async getAccessToken(): Promise<string> {
-    const { getAccessToken } = useAuth();
-    const token = await getAccessToken();
-    if (!token) {
+    if (!this.accessToken) {
       throw new Error('No access token available');
     }
-    return token;
+    return this.accessToken;
   }
 
   private async fetchWithAuth(url: string, options: RequestInit = {}): Promise<any> {
@@ -40,17 +43,37 @@ class GoogleDriveService {
       ...options.headers,
     };
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Google API error: ${response.status} ${response.statusText} ${JSON.stringify(errorData)}`);
+      if (!response.ok) {
+        let errorMessage = `Google API error: ${response.status} ${response.statusText}`;
+        
+        try {
+          const errorData = await response.json();
+          console.error('Google API error details:', errorData);
+          if (errorData.error) {
+            if (typeof errorData.error === 'string') {
+              errorMessage += ` - ${errorData.error}`;
+            } else if (errorData.error.message) {
+              errorMessage += ` - ${errorData.error.message}`;
+            }
+          }
+        } catch (e) {
+          // Ignore JSON parsing errors
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Fetch error:', error);
+      throw error;
     }
-
-    return response.json();
   }
 
   async createOrGetFolder(): Promise<string> {
