@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { GOOGLE_CLIENT_ID } from '../config/googleAuth';
+import { GOOGLE_CLIENT_ID, GOOGLE_DISCOVERY_DOCS, GOOGLE_SCOPES } from '../config/googleAuth';
 import { jwtDecode } from 'jwt-decode';
 
 interface UserProfile {
@@ -16,6 +16,7 @@ interface AuthContextType {
   signOut: () => void;
   openGoogleDrive: () => void;
   handleGoogleLoginSuccess: (credentialResponse: any) => void;
+  isGoogleApiLoaded: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,6 +24,44 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isGoogleApiLoaded, setIsGoogleApiLoaded] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  // Initialize Google API client when authenticated
+  useEffect(() => {
+    if (isAuthenticated && !isGoogleApiLoaded && !isInitializing) {
+      initGoogleApiClient();
+    }
+  }, [isAuthenticated, isGoogleApiLoaded, isInitializing]);
+
+  const initGoogleApiClient = async () => {
+    if (isInitializing) return;
+    setIsInitializing(true);
+
+    try {
+      // Load the Google API client
+      await new Promise<void>((resolve, reject) => {
+        window.gapi.load('client', {
+          callback: resolve,
+          onerror: reject
+        });
+      });
+
+      // Initialize the client
+      await window.gapi.client.init({
+        clientId: GOOGLE_CLIENT_ID,
+        discoveryDocs: GOOGLE_DISCOVERY_DOCS,
+        scope: GOOGLE_SCOPES,
+      });
+
+      console.log('Google API client initialized successfully');
+      setIsGoogleApiLoaded(true);
+    } catch (error) {
+      console.error('Error initializing Google API client:', error);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
   const handleGoogleLoginSuccess = (credentialResponse: any) => {
     console.log("AuthContext: Google Login Success", credentialResponse);
@@ -59,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log("Signing out...");
     setUser(null);
     setIsAuthenticated(false);
+    setIsGoogleApiLoaded(false);
   };
 
   const openGoogleDrive = () => {
@@ -74,6 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           signOut,
           openGoogleDrive,
           handleGoogleLoginSuccess,
+          isGoogleApiLoaded,
         }}
       >
         {children}

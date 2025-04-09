@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { Container, CssBaseline, ThemeProvider, createTheme, CircularProgress, Box, Typography } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -21,19 +21,24 @@ const theme = createTheme({
 });
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isGoogleApiLoaded } = useAuth();
   const [data, setData] = useState<any[]>([]);
   const [customColumns, setCustomColumns] = useState<string[]>([]);
   const [fileId, setFileId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && isGoogleApiLoaded) {
       initializeGoogleDrive();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isGoogleApiLoaded]);
 
   const initializeGoogleDrive = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
       const folderId = await googleDriveService.createOrGetFolder();
       const fileId = await googleDriveService.createOrGetDataFile(folderId);
@@ -43,6 +48,9 @@ const AppContent: React.FC = () => {
       setCustomColumns(content.customColumns || []);
     } catch (error) {
       console.error('Error initializing Google Drive:', error);
+      setError('Failed to initialize Google Drive. Please try again later.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -59,6 +67,14 @@ const AppContent: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (!isGoogleApiLoaded) {
+      console.error('Google API not loaded');
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
     try {
       await googleDriveService.updateFileContent(fileId, {
         dailyTracker: data,
@@ -67,11 +83,35 @@ const AppContent: React.FC = () => {
       });
     } catch (error) {
       console.error('Error saving data:', error);
+      setError('Failed to save data. Please try again later.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   if (!isAuthenticated) {
     return <LoginPage />;
+  }
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Typography color="error" variant="h6" gutterBottom>
+          {error}
+        </Typography>
+        <Typography variant="body1">
+          Please try refreshing the page or signing out and back in.
+        </Typography>
+      </Box>
+    );
   }
 
   return (
