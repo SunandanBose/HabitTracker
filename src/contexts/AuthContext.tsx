@@ -2,6 +2,19 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { GOOGLE_CLIENT_ID, GOOGLE_DISCOVERY_DOCS, GOOGLE_SCOPES } from '../config/googleAuth';
 import { jwtDecode } from 'jwt-decode';
+import Cookies from 'js-cookie';
+
+// Cookie configuration
+const COOKIE_OPTIONS = {
+  expires: 2/24, // 2 hours in days (1/12 of a day)
+  secure: process.env.NODE_ENV === 'production', // Secure in production
+  sameSite: 'strict' as const
+};
+
+// Cookie names
+const AUTH_COOKIE_PREFIX = 'habit_tracker_';
+const USER_COOKIE = `${AUTH_COOKIE_PREFIX}user`;
+const TOKEN_COOKIE = `${AUTH_COOKIE_PREFIX}token`;
 
 interface UserProfile {
   name: string;
@@ -32,10 +45,26 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Inner component that uses the Google OAuth hooks
 const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Try to load user from cookie
+  const loadUserFromCookie = (): UserProfile | null => {
+    const userCookie = Cookies.get(USER_COOKIE);
+    try {
+      return userCookie ? JSON.parse(userCookie) : null;
+    } catch (e) {
+      console.error('Error parsing user cookie:', e);
+      return null;
+    }
+  };
+
+  // Try to load token from cookie
+  const loadTokenFromCookie = (): string | null => {
+    return Cookies.get(TOKEN_COOKIE) || null;
+  };
+
+  const [user, setUser] = useState<UserProfile | null>(loadUserFromCookie());
+  const [isAuthenticated, setIsAuthenticated] = useState(!!loadUserFromCookie());
   const [isGoogleApiLoaded, setIsGoogleApiLoaded] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(loadTokenFromCookie());
   const [error, setError] = useState<string | null>(null);
   
   // Create a promise resolver for the token
@@ -43,6 +72,24 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
     resolve: (token: string | null) => void;
     reject: (error: Error) => void;
   } | null>(null);
+
+  // Save user to cookie whenever it changes
+  useEffect(() => {
+    if (user) {
+      Cookies.set(USER_COOKIE, JSON.stringify(user), COOKIE_OPTIONS);
+    } else {
+      Cookies.remove(USER_COOKIE);
+    }
+  }, [user]);
+
+  // Save token to cookie whenever it changes
+  useEffect(() => {
+    if (accessToken) {
+      Cookies.set(TOKEN_COOKIE, accessToken, COOKIE_OPTIONS);
+    } else {
+      Cookies.remove(TOKEN_COOKIE);
+    }
+  }, [accessToken]);
 
   // DEBUG: Log state changes
   useEffect(() => {
@@ -173,11 +220,19 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const signOut = () => {
     console.log("Signing out...");
+    // Clear state
     setUser(null);
     setIsAuthenticated(false);
     setIsGoogleApiLoaded(false);
     setAccessToken(null);
     setError(null);
+    
+    // Clear all auth cookies
+    Cookies.remove(USER_COOKIE);
+    Cookies.remove(TOKEN_COOKIE);
+    
+    // Reload the page to ensure all state is cleared
+    window.location.reload();
   };
 
   const openGoogleDrive = () => {
