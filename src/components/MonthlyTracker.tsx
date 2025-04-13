@@ -10,9 +10,92 @@ import {
   Typography,
   Box,
   LinearProgress,
+  useTheme,
+  useMediaQuery,
+  alpha,
+  styled
 } from '@mui/material';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+// Style customizations
+const StyledPaper = styled(Paper)(({ theme }) => ({
+  borderRadius: theme.spacing(2),
+  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.08)',
+  overflow: 'hidden',
+  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+  '&:hover': {
+    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
+    transform: 'translateY(-2px)'
+  },
+  marginBottom: theme.spacing(4),
+  padding: theme.spacing(3),
+  [theme.breakpoints.down('sm')]: {
+    padding: theme.spacing(2),
+    borderRadius: theme.spacing(1.5),
+  }
+}));
+
+const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
+  maxHeight: '65vh',
+  '&::-webkit-scrollbar': {
+    width: '8px',
+    height: '8px',
+  },
+  '&::-webkit-scrollbar-thumb': {
+    backgroundColor: alpha(theme.palette.primary.main, 0.2),
+    borderRadius: '4px',
+  },
+  '&::-webkit-scrollbar-track': {
+    backgroundColor: theme.palette.background.paper,
+  }
+}));
+
+const StyledTableHead = styled(TableHead)(({ theme }) => ({
+  '& .MuiTableCell-head': {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+  }
+}));
+
+const StyledTableRow = styled(TableRow)(({ theme }) => ({
+  '&:nth-of-type(odd)': {
+    backgroundColor: alpha(theme.palette.primary.light, 0.05),
+  },
+  '&:hover': {
+    backgroundColor: alpha(theme.palette.primary.light, 0.1),
+    transition: 'background-color 0.2s ease',
+  },
+  transition: 'background-color 0.2s ease',
+}));
+
+const HeaderBox = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: theme.spacing(3),
+  flexWrap: 'wrap',
+  gap: theme.spacing(2),
+  [theme.breakpoints.down('sm')]: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  }
+}));
+
+const StyledLinearProgress = styled(LinearProgress)(({ theme }) => ({
+  height: 12,
+  borderRadius: 6,
+  backgroundColor: alpha(theme.palette.grey[300], 0.8),
+  '& .MuiLinearProgress-bar': {
+    borderRadius: 6,
+    backgroundImage: `linear-gradient(to right, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+  }
+}));
 
 interface MonthlyTrackerProps {
   data: any[];
@@ -27,6 +110,9 @@ const MonthlyTracker: React.FC<MonthlyTrackerProps> = ({
   selectedMonth,
   onMonthChange,
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const calculateMonthlyStats = () => {
     const monthStart = startOfMonth(selectedMonth);
     const monthEnd = endOfMonth(selectedMonth);
@@ -55,63 +141,85 @@ const MonthlyTracker: React.FC<MonthlyTrackerProps> = ({
   const monthlyStats = calculateMonthlyStats();
 
   return (
-    <Paper sx={{ p: 2, mt: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">
+    <StyledPaper elevation={3}>
+      <HeaderBox>
+        <Typography variant="h5" color="primary" fontWeight="600">
           Monthly Overview - {format(selectedMonth, 'MMMM yyyy')}
         </Typography>
         <DatePicker
           value={selectedMonth}
           onChange={(newDate) => newDate && onMonthChange(newDate)}
           views={['year', 'month']}
+          slotProps={{ 
+            textField: { 
+              size: isMobile ? 'small' : 'medium',
+              sx: { minWidth: 150 }
+            } 
+          }}
         />
-      </Box>
+      </HeaderBox>
 
-      <TableContainer>
-        <Table>
-          <TableHead>
+      <StyledTableContainer>
+        <Table sx={{ minWidth: isMobile ? undefined : 650 }} stickyHeader>
+          <StyledTableHead>
             <TableRow>
               <TableCell>Habit</TableCell>
               <TableCell>Progress</TableCell>
               <TableCell align="right">Completion</TableCell>
             </TableRow>
-          </TableHead>
+          </StyledTableHead>
           <TableBody>
-            {monthlyStats.map((stat) => (
-              <TableRow key={stat.habit}>
-                <TableCell>{stat.habit}</TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Box sx={{ width: '100%', mr: 1 }}>
-                      <LinearProgress
-                        variant="determinate"
-                        value={stat.percentage}
-                        sx={{
-                          height: 10,
-                          borderRadius: 5,
-                          backgroundColor: '#e0e0e0',
-                          '& .MuiLinearProgress-bar': {
-                            borderRadius: 5,
-                          },
-                        }}
-                      />
+            {monthlyStats.length > 0 ? (
+              monthlyStats.map((stat) => (
+                <StyledTableRow key={stat.habit}>
+                  <TableCell>
+                    <Typography fontWeight="500">{stat.habit}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                      <Box sx={{ width: '100%', mr: 1 }}>
+                        <StyledLinearProgress
+                          variant="determinate"
+                          value={stat.percentage}
+                        />
+                      </Box>
+                      <Box sx={{ minWidth: 45, textAlign: 'right' }}>
+                        <Typography 
+                          variant="body2" 
+                          color={stat.percentage > 70 ? 'primary.main' : 'text.secondary'}
+                          fontWeight={stat.percentage > 70 ? 600 : 400}
+                        >
+                          {`${stat.percentage}%`}
+                        </Typography>
+                      </Box>
                     </Box>
-                    <Box sx={{ minWidth: 35 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        {`${stat.percentage}%`}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </TableCell>
-                <TableCell align="right">
-                  {stat.completed} / {stat.total} days
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 500, 
+                        color: theme.palette.text.primary
+                      }}
+                    >
+                      {stat.completed} / {stat.total} days
+                    </Typography>
+                  </TableCell>
+                </StyledTableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No data available for this month or no habits defined.
+                  </Typography>
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
-      </TableContainer>
-    </Paper>
+      </StyledTableContainer>
+    </StyledPaper>
   );
 };
 

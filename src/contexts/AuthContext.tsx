@@ -51,7 +51,6 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
     try {
       return userCookie ? JSON.parse(userCookie) : null;
     } catch (e) {
-      console.error('Error parsing user cookie:', e);
       return null;
     }
   };
@@ -91,25 +90,12 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
     }
   }, [accessToken]);
 
-  // DEBUG: Log state changes
-  useEffect(() => {
-    console.log('Auth Context State Changed:', { 
-      isAuthenticated, 
-      isGoogleApiLoaded,
-      hasAccessToken: !!accessToken,
-      hasUser: !!user,
-      error
-    });
-  }, [isAuthenticated, isGoogleApiLoaded, accessToken, user, error]);
-
   // Use the Google login hook from @react-oauth/google with callbacks
   const googleLogin = useGoogleLogin({
     onSuccess: (tokenResponse) => {
-      console.log('Google login success with token response:', tokenResponse);
       const token = tokenResponse.access_token;
       
       if (!token) {
-        console.error('Token response did not contain an access token');
         setError('No access token received from Google');
         if (tokenResolver) {
           tokenResolver.reject(new Error('No access token received from Google'));
@@ -124,13 +110,11 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
       
       // If there's a pending token request, resolve it
       if (tokenResolver) {
-        console.log('Resolving pending token request');
         tokenResolver.resolve(token);
         setTokenResolver(null);
       }
     },
     onError: (error) => {
-      console.error('Google login error:', error);
       setError('Failed to get access token. Please check your Google OAuth configuration.');
       setIsGoogleApiLoaded(false);
       
@@ -143,15 +127,12 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
     scope: GOOGLE_SCOPES,
     flow: 'implicit', // Use implicit flow
     onNonOAuthError: (error: NonOAuthError) => {
-      console.error('Non-OAuth error during login:', error);
       setError(`Login error: ${error.type} - ${error.description || error.error || 'Unknown error'}`);
     }
   });
 
   // Function to get the current access token
   const getAccessToken = async (): Promise<string | null> => {
-    console.log('getAccessToken called, current token:', accessToken ? 'exists' : 'null');
-    
     // If we already have a token, return it
     if (accessToken) {
       return accessToken;
@@ -159,41 +140,31 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
     
     // If user is authenticated but we don't have a token, request one
     if (isAuthenticated) {
-      console.log('User is authenticated but no token exists, requesting one...');
       try {
         // Create a new promise that will be resolved when we get the token
         const tokenPromise = new Promise<string | null>((resolve, reject) => {
-          console.log('Setting up token resolver');
           setTokenResolver({ resolve, reject });
         });
         
         // Trigger the Google login flow
-        console.log('Triggering Google login flow');
         googleLogin();
         
         // Wait for the promise to resolve (it will be resolved in the onSuccess callback)
-        console.log('Waiting for token promise to resolve');
         const token = await tokenPromise;
-        console.log('Token promise resolved:', token ? 'got token' : 'no token');
         return token;
       } catch (error) {
-        console.error('Error in getAccessToken:', error);
         setError('Failed to get access token. Please try again.');
         return null;
       }
     }
     
-    console.log('User is not authenticated, cannot get token');
     return null;
   };
 
   const handleGoogleLoginSuccess = (credentialResponse: any) => {
-    console.log("AuthContext: Google Login Success", credentialResponse);
-    
     try {
       // Decode the JWT token to get user profile information
       const decoded = jwtDecode<any>(credentialResponse.credential);
-      console.log("Decoded JWT: ", decoded);
       
       // Create a user profile object with the decoded information
       const userProfile: UserProfile = {
@@ -208,18 +179,13 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
       setError(null);
       
       // After successful authentication, get an access token for Google Drive
-      // We don't await here because we want to let the component render
-      // The useGoogleDrive hook will handle waiting for the token
-      console.log('Triggering Google login after successful authentication');
       googleLogin();
     } catch (error) {
-      console.error("Error decoding JWT: ", error);
       setError('Error processing authentication response');
     }
   };
 
   const signOut = () => {
-    console.log("Signing out...");
     // Clear state
     setUser(null);
     setIsAuthenticated(false);

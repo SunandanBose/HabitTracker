@@ -9,7 +9,9 @@ import {
   Typography,
   Button,
   Alert,
-  AlertTitle
+  AlertTitle,
+  alpha,
+  responsiveFontSizes
 } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -19,21 +21,115 @@ import Header from './components/Header';
 import DailyTracker from './components/DailyTracker';
 import MonthlyTracker from './components/MonthlyTracker';
 import { useGoogleDrive } from './hooks/useGoogleDrive';
-import AuthDebugger from './components/AuthDebugger';
+
+// Import or define the TrackerRow interface to match DailyTracker component
+interface TrackerRow {
+  id: number;
+  slNo: number;
+  date: string;
+  day: string;
+  month: string;
+  comment: string;
+  [key: string]: any; // This allows dynamic column names
+}
 
 // Check if we're in development mode
 const isDevelopment = process.env.NODE_ENV === 'development';
 
-const theme = createTheme({
+// Create a theme instance.
+let theme = createTheme({
   palette: {
     primary: {
+      light: '#64b5f6',
       main: '#2196f3',
+      dark: '#1976d2',
+      contrastText: '#fff',
     },
     secondary: {
+      light: '#ff4081',
       main: '#f50057',
+      dark: '#c51162',
+      contrastText: '#fff',
+    },
+    background: {
+      default: '#f9fafc',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#2c3e50',
+      secondary: '#546e7a',
+    },
+    error: {
+      main: '#f44336',
+    },
+    success: {
+      main: '#4caf50',
+    }
+  },
+  typography: {
+    fontFamily: [
+      '-apple-system',
+      'BlinkMacSystemFont',
+      '"Segoe UI"',
+      'Roboto',
+      '"Helvetica Neue"',
+      'Arial',
+      'sans-serif',
+    ].join(','),
+    h5: {
+      fontWeight: 600,
+    },
+    h6: {
+      fontWeight: 600,
+    },
+    button: {
+      textTransform: 'none',
+      fontWeight: 500,
+    },
+  },
+  shape: {
+    borderRadius: 8,
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          padding: '8px 16px',
+        },
+        contained: {
+          boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)',
+          '&:hover': {
+            boxShadow: '0 6px 15px rgba(0, 0, 0, 0.20)',
+          },
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        rounded: {
+          borderRadius: 12,
+        },
+        elevation1: {
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.08)',
+        },
+        elevation2: {
+          boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          padding: '16px',
+        },
+      },
     },
   },
 });
+
+// Apply responsive font sizes
+theme = responsiveFontSizes(theme);
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, user, signOut } = useAuth();
@@ -45,7 +141,7 @@ const AppContent: React.FC = () => {
     initializeGoogleDrive 
   } = useGoogleDrive();
   
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<TrackerRow[]>([]);
   const [customColumns, setCustomColumns] = useState<string[]>([]);
   const [fileId, setFileId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -54,29 +150,25 @@ const AppContent: React.FC = () => {
 
   // Define loadUserData before any useEffect that depends on it
   const loadUserData = useCallback(async () => {
-    console.log('App: loadUserData called');
     setIsLoading(true);
     setError(null);
     
     try {
-      console.log('App: Creating or getting folder...');
       const folderId = await googleDriveService.createOrGetFolder();
-      console.log('App: Got folder ID:', folderId);
-      
-      console.log('App: Creating or getting data file...');
       const fileId = await googleDriveService.createOrGetDataFile(folderId);
-      console.log('App: Got file ID:', fileId);
       setFileId(fileId);
       
-      console.log('App: Getting file content...');
       const content = await googleDriveService.getFileContent(fileId);
-      console.log('App: Got file content:', content);
       
-      setData(content.dailyTracker || []);
+      // Ensure all rows have slNo property
+      const trackerData = (content.dailyTracker || []).map((row: any, index: number) => ({
+        ...row,
+        slNo: row.slNo || index + 1, // Use existing slNo or create sequential one
+      })) as TrackerRow[];
+      
+      setData(trackerData);
       setCustomColumns(content.customColumns || []);
-      console.log('App: Data loaded successfully');
     } catch (error: any) {
-      console.error('Error loading user data:', error);
       setError(`Failed to load user data: ${error.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -92,16 +184,7 @@ const AppContent: React.FC = () => {
 
   // Load user data when drive is initialized
   useEffect(() => {
-    console.log('App: Drive initialization state changed:', { 
-      isAuthenticated, 
-      isInitialized, 
-      fileId,
-      isLoading,
-      isDriveLoading
-    });
-    
     if (isAuthenticated && isInitialized && fileId === '' && !isLoading) {
-      console.log('App: Loading user data...');
       loadUserData();
     }
   }, [isAuthenticated, isInitialized, fileId, isLoading, isDriveLoading, loadUserData]);
@@ -112,12 +195,9 @@ const AppContent: React.FC = () => {
     
     // If we're in a loading state for more than 10 seconds, trigger an error
     if (isDriveLoading) {
-      console.log('Setting loading timeout detection...');
       timeoutId = setTimeout(() => {
-        console.error('Loading state persisted for too long - possible stuck state detected');
         // Force initialize/retry if we appear to be stuck
         if (isDriveLoading) {
-          console.log('Forcing Google Drive initialization retry...');
           initializeGoogleDrive();
         }
       }, 10000); // 10 seconds
@@ -131,7 +211,6 @@ const AppContent: React.FC = () => {
   }, [isDriveLoading, initializeGoogleDrive]);
 
   const handleRetry = () => {
-    console.log('App: Retrying initialization...');
     setError(null);
     initializeGoogleDrive();
   };
@@ -140,12 +219,30 @@ const AppContent: React.FC = () => {
     setCustomColumns([...customColumns, columnName]);
   };
 
-  const handleAddRow = (row: any) => {
-    setData([...data, row]);
+  const handleAddRow = (row: TrackerRow) => {
+    // Validate the row
+    if (!row || !row.date) {
+      console.error('Cannot add invalid row:', row);
+      return;
+    }
+    
+    // Ensure the row has all required properties
+    const validRow = {
+      ...row,
+      id: row.id || Date.now(),
+      slNo: row.slNo || data.length + 1,
+      // Make sure all custom columns exist (with default false value)
+      ...customColumns.reduce((acc, col) => ({
+        ...acc,
+        [col]: typeof row[col] === 'boolean' ? row[col] : false
+      }), {})
+    };
+    
+    // Update state with the new row
+    setData(prevData => [...prevData, validRow]);
   };
 
-  const handleUpdateRow = (updatedRow: any) => {
-    console.log('Updating row:', updatedRow);
+  const handleUpdateRow = (updatedRow: TrackerRow) => {
     // Use map to find and replace the updated row
     setData(prevData => 
       prevData.map(row => row.id === updatedRow.id ? updatedRow : row)
@@ -162,20 +259,18 @@ const AppContent: React.FC = () => {
     setError(null);
     
     try {
-      console.log('Saving data to Google Drive...', {
-        dailyTracker: data,
-        customColumns
-      });
+      // Ensure all rows have valid slNo before saving
+      const dataToSave = data.map((row, index) => ({
+        ...row,
+        slNo: row.slNo || index + 1 // Fallback to index+1 if slNo is missing
+      }));
       
       await googleDriveService.updateFileContent(fileId, {
-        dailyTracker: data,
+        dailyTracker: dataToSave,
         monthlyTracker: [], // This will be calculated in the MonthlyTracker component
         customColumns,
       });
-      
-      console.log('Data saved successfully');
     } catch (error: any) {
-      console.error('Error saving data:', error);
       setError(`Failed to save data: ${error.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -190,9 +285,16 @@ const AppContent: React.FC = () => {
   // Show loading spinner while initializing or loading data
   if (isLoading || isDriveLoading) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress sx={{ mb: 2 }} />
-        <Typography variant="h6">
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        background: alpha(theme.palette.primary.light, 0.05)
+      }}>
+        <CircularProgress sx={{ mb: 2, color: theme.palette.primary.main }} />
+        <Typography variant="h6" color="primary.main">
           {isDriveLoading ? 'Initializing Google Drive...' : 'Loading your data...'}
         </Typography>
       </Box>
@@ -202,10 +304,24 @@ const AppContent: React.FC = () => {
   // Show error message if there's an error
   if (error) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', p: 3 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh', 
+        p: 3,
+        background: alpha(theme.palette.error.light, 0.05)
+      }}>
         <Alert 
           severity="error" 
-          sx={{ mb: 3, width: '100%', maxWidth: 600 }}
+          sx={{ 
+            mb: 3, 
+            width: '100%', 
+            maxWidth: 600,
+            borderRadius: 2,
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+          }}
         >
           <AlertTitle>Error</AlertTitle>
           {error}
@@ -232,7 +348,15 @@ const AppContent: React.FC = () => {
           </Button>
         </Box>
         
-        <Alert severity="info" sx={{ width: '100%', maxWidth: 600 }}>
+        <Alert 
+          severity="info" 
+          sx={{ 
+            width: '100%', 
+            maxWidth: 600,
+            borderRadius: 2,
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)',
+          }}
+        >
           <AlertTitle>Troubleshooting Steps</AlertTitle>
           <Typography variant="body2">
             If you continue to see this error, please make sure your Google OAuth client ID is configured correctly:
@@ -258,7 +382,13 @@ const AppContent: React.FC = () => {
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <CssBaseline />
         <Header />
-        <Container maxWidth="lg">
+        <Container 
+          maxWidth="lg" 
+          sx={{ 
+            py: 4,
+            px: { xs: 2, sm: 3 }
+          }}
+        >
           <MonthlyTracker 
             data={data} 
             customColumns={customColumns} 
@@ -274,7 +404,6 @@ const AppContent: React.FC = () => {
             onSave={handleSave}
           />
         </Container>
-        {isDevelopment && <AuthDebugger />}
       </LocalizationProvider>
     </ThemeProvider>
   );
