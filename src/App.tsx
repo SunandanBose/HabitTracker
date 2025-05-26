@@ -20,7 +20,17 @@ import LoginPage from './components/LoginPage';
 import Header from './components/Header';
 import DailyTracker from './components/DailyTracker';
 import MonthlyTracker from './components/MonthlyTracker';
+import CollapsibleSection from './components/CollapsibleSection';
+import StartNewHabitButton from './components/StartNewHabitButton';
+import PWAInstallButton from './components/PWAInstallButton';
+import OfflineIndicator from './components/OfflineIndicator';
+import NotificationSettings from './components/NotificationSettings';
 import { useGoogleDrive } from './hooks/useGoogleDrive';
+import { notificationService } from './services/notificationService';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import { format } from 'date-fns';
 
 // Import or define the TrackerRow interface to match DailyTracker component
 interface TrackerRow {
@@ -32,9 +42,6 @@ interface TrackerRow {
   comment: string;
   [key: string]: any; // This allows dynamic column names
 }
-
-// Check if we're in development mode
-const isDevelopment = process.env.NODE_ENV === 'development';
 
 // Create a theme instance.
 let theme = createTheme({
@@ -132,7 +139,7 @@ let theme = createTheme({
 theme = responsiveFontSizes(theme);
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, user, signOut } = useAuth();
+  const { isAuthenticated, signOut, clearCookiesAndRefresh } = useAuth();
   const { 
     googleDriveService, 
     isInitialized, 
@@ -147,6 +154,15 @@ const AppContent: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFallbackButton, setShowFallbackButton] = useState(false);
+
+  // Initialize notification service when app loads
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Initialize notifications when user is authenticated
+      notificationService.onAppActive();
+    }
+  }, [isAuthenticated]);
 
   // Define loadUserData before any useEffect that depends on it
   const loadUserData = useCallback(async () => {
@@ -210,9 +226,35 @@ const AppContent: React.FC = () => {
     };
   }, [isDriveLoading, initializeGoogleDrive]);
 
+  // Add timeout for fallback button (30 seconds)
+  useEffect(() => {
+    let fallbackTimeoutId: NodeJS.Timeout | null = null;
+    
+    // Show fallback button after 30 seconds of loading
+    if ((isLoading || isDriveLoading) && isAuthenticated) {
+      fallbackTimeoutId = setTimeout(() => {
+        setShowFallbackButton(true);
+      }, 30000); // 30 seconds
+    } else {
+      // Reset fallback button when not loading
+      setShowFallbackButton(false);
+    }
+    
+    return () => {
+      if (fallbackTimeoutId) {
+        clearTimeout(fallbackTimeoutId);
+      }
+    };
+  }, [isLoading, isDriveLoading, isAuthenticated]);
+
   const handleRetry = () => {
     setError(null);
+    setShowFallbackButton(false);
     initializeGoogleDrive();
+  };
+
+  const handleFallbackAction = () => {
+    clearCookiesAndRefresh();
   };
 
   const handleAddColumn = (columnName: string) => {
@@ -249,17 +291,49 @@ const AppContent: React.FC = () => {
     );
   };
 
-  const handleDeleteRow = (rowId: number) => {
-    // Filter out the row with the specified id
-    setData(prevData => prevData.filter(row => row.id !== rowId));
-  };
-
-  const handleSave = async () => {
+  const handleDeleteHabit = async (habitName: string) => {
     if (!isInitialized) {
       setError('Google Drive not initialized. Please try again later.');
       return;
     }
     
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Remove the habit from custom columns
+      const updatedCustomColumns = customColumns.filter(col => col !== habitName);
+      setCustomColumns(updatedCustomColumns);
+      
+      // Remove the habit from all data entries
+      const updatedData = data.map(row => {
+        const { [habitName]: removed, ...rest } = row;
+        return rest as TrackerRow;
+      });
+      setData(updatedData);
+      
+      // Save to Google Drive
+      await googleDriveService.updateFileContent(fileId, {
+        dailyTracker: updatedData,
+        monthlyTracker: [],
+        customColumns: updatedCustomColumns,
+      });
+    } catch (error: any) {
+      setError(`Failed to delete habit: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    console.log('App: handleSave called');
+    if (!isInitialized) {
+      console.log('App: Google Drive not initialized');
+      setError('Google Drive not initialized. Please try again later.');
+      return;
+    }
+    
+    console.log('App: Starting save process, data length:', data.length);
     setIsLoading(true);
     setError(null);
     
@@ -270,12 +344,15 @@ const AppContent: React.FC = () => {
         slNo: row.slNo || index + 1 // Fallback to index+1 if slNo is missing
       }));
       
+      console.log('App: Saving data to Google Drive, fileId:', fileId);
       await googleDriveService.updateFileContent(fileId, {
         dailyTracker: dataToSave,
         monthlyTracker: [], // This will be calculated in the MonthlyTracker component
         customColumns,
       });
+      console.log('App: Save completed successfully');
     } catch (error: any) {
+      console.error('App: Failed to save data:', error);
       setError(`Failed to save data: ${error.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -296,8 +373,45 @@ const AppContent: React.FC = () => {
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh',
-        background: alpha(theme.palette.primary.light, 0.05)
+        background: alpha(theme.palette.primary.light, 0.05),
+        position: 'relative'
       }}>
+        {showFallbackButton && (
+          <Box sx={{ 
+            position: 'absolute',
+            top: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000
+          }}>
+            <Alert 
+              severity="warning" 
+              sx={{ 
+                mb: 2,
+                borderRadius: 2,
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+              }}
+              action={
+                <Button 
+                  color="inherit" 
+                  size="small" 
+                  onClick={handleFallbackAction}
+                  variant="outlined"
+                  sx={{ 
+                    borderColor: 'currentColor',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.warning.main, 0.1)
+                    }
+                  }}
+                >
+                  Clear Cookies & Refresh
+                </Button>
+              }
+            >
+              Taking longer than usual? Try clearing cookies and refreshing.
+            </Alert>
+          </Box>
+        )}
         <CircularProgress sx={{ mb: 2, color: theme.palette.primary.main }} />
         <Typography variant="h6" color="primary.main">
           {isDriveLoading ? 'Initializing Google Drive...' : 'Loading your data...'}
@@ -394,21 +508,50 @@ const AppContent: React.FC = () => {
             px: { xs: 2, sm: 3 }
           }}
         >
-          <MonthlyTracker 
-            data={data} 
-            customColumns={customColumns} 
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
-          <DailyTracker
-            data={data}
-            customColumns={customColumns}
-            onAddColumn={handleAddColumn}
-            onAddRow={handleAddRow}
-            onUpdateRow={handleUpdateRow}
-            onDeleteRow={handleDeleteRow}
-            onSave={handleSave}
-          />
+          <CollapsibleSection
+            title={`Monthly Overview - ${format(selectedMonth, 'MMMM yyyy')}`}
+            icon={<CalendarTodayIcon />}
+            defaultExpanded={true}
+          >
+            <MonthlyTracker 
+              data={data} 
+              customColumns={customColumns} 
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              onUpdateRow={handleUpdateRow}
+              onAddRow={handleAddRow}
+              onDeleteHabit={handleDeleteHabit}
+              onSave={handleSave}
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Daily Tracker"
+            icon={<AssignmentIcon />}
+            defaultExpanded={false}
+          >
+            <DailyTracker
+              data={data}
+              customColumns={customColumns}
+              onAddColumn={handleAddColumn}
+              onAddRow={handleAddRow}
+              onUpdateRow={handleUpdateRow}
+              onSave={handleSave}
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Notification Settings"
+            icon={<NotificationsIcon />}
+            defaultExpanded={false}
+          >
+            <NotificationSettings />
+          </CollapsibleSection>
+
+          <StartNewHabitButton onAddHabit={handleAddColumn} />
+
+          <PWAInstallButton />
+          <OfflineIndicator />
         </Container>
       </LocalizationProvider>
     </ThemeProvider>

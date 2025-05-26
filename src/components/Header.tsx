@@ -14,6 +14,7 @@ import {
   styled
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationStatusIndicator from './NotificationStatusIndicator';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
@@ -90,12 +91,13 @@ const Header: React.FC = () => {
             Habit Tracker
           </Typography>
           {user && (
-            <Box display="flex" alignItems="center">
+            <Box display="flex" alignItems="center" gap={2}>
+              <NotificationStatusIndicator compact={isMobile} />
+              
               {!isMobile && (
                 <Typography 
                   variant="body1" 
                   sx={{ 
-                    mr: 2, 
                     color: 'text.secondary',
                     fontWeight: 500 
                   }}
