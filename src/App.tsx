@@ -22,6 +22,8 @@ import DailyTracker from './components/DailyTracker';
 import MonthlyTracker from './components/MonthlyTracker';
 import CollapsibleSection from './components/CollapsibleSection';
 import StartNewHabitButton from './components/StartNewHabitButton';
+import PWAInstallButton from './components/PWAInstallButton';
+import OfflineIndicator from './components/OfflineIndicator';
 import { useGoogleDrive } from './hooks/useGoogleDrive';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -528,6 +530,9 @@ const AppContent: React.FC = () => {
           </CollapsibleSection>
 
           <StartNewHabitButton onAddHabit={handleAddColumn} />
+
+          <PWAInstallButton />
+          <OfflineIndicator />
         </Container>
       </LocalizationProvider>
     </ThemeProvider>
