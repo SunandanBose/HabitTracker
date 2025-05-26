@@ -25,12 +25,9 @@ import {
   Grid,
   FormControl,
   FormControlLabel,
-  InputLabel,
-  Tooltip,
-  Alert
+  InputLabel
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format } from 'date-fns';
 
@@ -40,17 +37,14 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   boxShadow: '0 6px 20px rgba(0, 0, 0, 0.08)',
   overflow: 'hidden',
   transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-  position: 'relative',
   '&:hover': {
     boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
     transform: 'translateY(-2px)'
   },
   marginBottom: theme.spacing(4),
   padding: theme.spacing(3),
-  paddingBottom: theme.spacing(8),
   [theme.breakpoints.down('sm')]: {
     padding: theme.spacing(2),
-    paddingBottom: theme.spacing(7),
     borderRadius: theme.spacing(1.5),
   }
 }));
@@ -101,11 +95,11 @@ const StyledCheckbox = styled(Checkbox)(({ theme }) => ({
 }));
 
 const AddButton = styled(Fab)(({ theme }) => ({
-  position: 'absolute',
+  position: 'fixed',
   bottom: theme.spacing(3),
   right: theme.spacing(3),
   boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)',
-  zIndex: 100,
+  zIndex: 1000,
   [theme.breakpoints.down('sm')]: {
     bottom: theme.spacing(2),
     right: theme.spacing(2),
@@ -152,34 +146,6 @@ const ReadOnlyField = styled(TextField)(({ theme }) => ({
   }
 }));
 
-const DeleteButton = styled(IconButton)(({ theme }) => ({
-  color: theme.palette.error.main,
-  transition: 'all 0.2s ease',
-  '&:hover': {
-    backgroundColor: alpha(theme.palette.error.main, 0.1),
-    transform: 'scale(1.1)',
-  }
-}));
-
-const InfoItem = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  marginBottom: theme.spacing(1.5),
-  padding: theme.spacing(1),
-  borderRadius: theme.spacing(1),
-  backgroundColor: alpha(theme.palette.primary.light, 0.05),
-}));
-
-const InfoLabel = styled(Typography)(({ theme }) => ({
-  fontWeight: 600,
-  width: '100px',
-  color: theme.palette.text.secondary,
-}));
-
-const InfoValue = styled(Typography)(({ theme }) => ({
-  flex: 1,
-  fontWeight: 500,
-}));
-
 // Define a proper type for row data
 interface TrackerRow {
   id: number;
@@ -206,7 +172,6 @@ interface DailyTrackerProps {
   onAddColumn: (columnName: string) => void;
   onAddRow: (row: TrackerRow) => void;
   onUpdateRow: (row: TrackerRow) => void;
-  onDeleteRow: (rowId: number) => void;
   onSave: () => void;
 }
 
@@ -216,7 +181,6 @@ const DailyTracker: React.FC<DailyTrackerProps> = ({
   onAddColumn,
   onAddRow,
   onUpdateRow,
-  onDeleteRow,
   onSave,
 }) => {
   const theme = useTheme();
@@ -225,8 +189,6 @@ const DailyTracker: React.FC<DailyTrackerProps> = ({
   const [newColumnDialog, setNewColumnDialog] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [newRowDialog, setNewRowDialog] = useState(false);
-  const [deleteDialog, setDeleteDialog] = useState(false);
-  const [rowToDelete, setRowToDelete] = useState<TrackerRow | null>(null);
   
   // Initialize form data
   const initializeNewRowForm = (): NewRowForm => {
@@ -343,28 +305,6 @@ const DailyTracker: React.FC<DailyTrackerProps> = ({
     }
   };
 
-  const handleOpenDeleteDialog = (row: TrackerRow) => {
-    setRowToDelete(row);
-    setDeleteDialog(true);
-  };
-
-  const handleCloseDeleteDialog = () => {
-    setDeleteDialog(false);
-    setRowToDelete(null);
-  };
-
-  const handleDeleteRow = () => {
-    if (rowToDelete) {
-      onDeleteRow(rowToDelete.id);
-      handleCloseDeleteDialog();
-    }
-  };
-
-  // Get active habits for a row to display in the delete confirmation dialog
-  const getActiveHabits = (row: TrackerRow) => {
-    return customColumns.filter(column => Boolean(row[column]));
-  };
-
   return (
     <StyledPaper elevation={3}>
       <HeaderBox>
@@ -402,7 +342,7 @@ const DailyTracker: React.FC<DailyTrackerProps> = ({
                 <TableCell key={column}>{column}</TableCell>
               ))}
               <TableCell>Comment</TableCell>
-              <TableCell align="center">Actions</TableCell>
+              <TableCell></TableCell>
             </TableRow>
           </StyledTableHead>
           <TableBody>
@@ -421,24 +361,14 @@ const DailyTracker: React.FC<DailyTrackerProps> = ({
                   </TableCell>
                 ))}
                 <TableCell>{row.comment}</TableCell>
-                <TableCell align="center">
-                  <Tooltip title="Delete Entry">
-                    <DeleteButton
-                      size="small"
-                      onClick={() => handleOpenDeleteDialog(row)}
-                      data-testid={`delete-row-${row.id}`}
-                    >
-                      <DeleteIcon />
-                    </DeleteButton>
-                  </Tooltip>
-                </TableCell>
+                <TableCell></TableCell>
               </StyledTableRow>
             ))}
             
             {/* Show empty row with message if no data */}
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6 + customColumns.length} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={5 + customColumns.length + 1} align="center" sx={{ py: 6 }}>
                   <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
                     No data available. Click the "Add Row" button to create a new entry.
                   </Typography>
@@ -617,107 +547,6 @@ const DailyTracker: React.FC<DailyTrackerProps> = ({
             data-testid="add-row-button"
           >
             Add Entry
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialog}
-        onClose={handleCloseDeleteDialog}
-        maxWidth="sm"
-        PaperProps={{
-          elevation: 8,
-          sx: {
-            borderRadius: 2,
-            padding: 1,
-            width: '100%'
-          }
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 600, color: theme.palette.error.main }}>
-          Delete Tracker Entry?
-        </DialogTitle>
-        <DialogContent>
-          {rowToDelete && (
-            <Box>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                Are you sure you want to delete this entry? This action cannot be undone.
-              </Typography>
-              
-              <Box 
-                sx={{
-                  backgroundColor: alpha(theme.palette.error.light, 0.1),
-                  borderRadius: 2,
-                  p: 2,
-                  mb: 3,
-                  border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-                }}
-              >
-                <Typography variant="subtitle1" fontWeight="600" sx={{ mb: 1.5 }}>
-                  Entry Details:
-                </Typography>
-                
-                <InfoItem>
-                  <InfoLabel variant="body2">Date:</InfoLabel>
-                  <InfoValue variant="body2">{rowToDelete.date}</InfoValue>
-                </InfoItem>
-                
-                <InfoItem>
-                  <InfoLabel variant="body2">Day:</InfoLabel>
-                  <InfoValue variant="body2">{rowToDelete.day}</InfoValue>
-                </InfoItem>
-                
-                <InfoItem>
-                  <InfoLabel variant="body2">Month:</InfoLabel>
-                  <InfoValue variant="body2">{rowToDelete.month}</InfoValue>
-                </InfoItem>
-                
-                {rowToDelete.comment && (
-                  <InfoItem>
-                    <InfoLabel variant="body2">Comment:</InfoLabel>
-                    <InfoValue variant="body2">{rowToDelete.comment}</InfoValue>
-                  </InfoItem>
-                )}
-                
-                {getActiveHabits(rowToDelete).length > 0 && (
-                  <InfoItem>
-                    <InfoLabel variant="body2">Habits:</InfoLabel>
-                    <Box>
-                      {getActiveHabits(rowToDelete).map((habit, index) => (
-                        <Typography key={habit} variant="body2" component="span">
-                          {habit}{index < getActiveHabits(rowToDelete).length - 1 ? ', ' : ''}
-                        </Typography>
-                      ))}
-                    </Box>
-                  </InfoItem>
-                )}
-              </Box>
-              
-              <Alert severity="info" sx={{ mb: 2 }}>
-                <Typography variant="body2">
-                  After deleting, you'll still need to click the "Save" button to save your changes to Google Drive.
-                </Typography>
-              </Alert>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button 
-            onClick={handleCloseDeleteDialog} 
-            color="inherit"
-            variant="outlined"
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleDeleteRow} 
-            variant="contained" 
-            color="error"
-            startIcon={<DeleteIcon />}
-            disableElevation
-          >
-            Delete Entry
           </Button>
         </DialogActions>
       </Dialog>

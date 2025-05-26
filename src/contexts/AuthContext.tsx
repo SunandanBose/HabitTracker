@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
-import { GOOGLE_CLIENT_ID, GOOGLE_DISCOVERY_DOCS, GOOGLE_SCOPES } from '../config/googleAuth';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { GOOGLE_CLIENT_ID } from '../config/googleAuth';
 import { jwtDecode } from 'jwt-decode';
 import Cookies from 'js-cookie';
 
@@ -65,12 +65,6 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
   const [isGoogleApiLoaded, setIsGoogleApiLoaded] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(loadTokenFromCookie());
   const [error, setError] = useState<string | null>(null);
-  
-  // Create a promise resolver for the token
-  const [tokenResolver, setTokenResolver] = useState<{
-    resolve: (token: string | null) => void;
-    reject: (error: Error) => void;
-  } | null>(null);
 
   // Save user to cookie whenever it changes
   useEffect(() => {
@@ -90,47 +84,6 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
     }
   }, [accessToken]);
 
-  // Use the Google login hook from @react-oauth/google with callbacks
-  const googleLogin = useGoogleLogin({
-    onSuccess: (tokenResponse) => {
-      const token = tokenResponse.access_token;
-      
-      if (!token) {
-        setError('No access token received from Google');
-        if (tokenResolver) {
-          tokenResolver.reject(new Error('No access token received from Google'));
-          setTokenResolver(null);
-        }
-        return;
-      }
-      
-      setAccessToken(token);
-      setIsGoogleApiLoaded(true);
-      setError(null);
-      
-      // If there's a pending token request, resolve it
-      if (tokenResolver) {
-        tokenResolver.resolve(token);
-        setTokenResolver(null);
-      }
-    },
-    onError: (error) => {
-      setError('Failed to get access token. Please check your Google OAuth configuration.');
-      setIsGoogleApiLoaded(false);
-      
-      // If there's a pending token request, reject it
-      if (tokenResolver) {
-        tokenResolver.reject(new Error('Failed to get access token'));
-        setTokenResolver(null);
-      }
-    },
-    scope: GOOGLE_SCOPES,
-    flow: 'implicit', // Use implicit flow
-    onNonOAuthError: (error: NonOAuthError) => {
-      setError(`Login error: ${error.type} - ${error.description || error.error || 'Unknown error'}`);
-    }
-  });
-
   // Function to get the current access token
   const getAccessToken = async (): Promise<string | null> => {
     // If we already have a token, return it
@@ -138,50 +91,79 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
       return accessToken;
     }
     
-    // If user is authenticated but we don't have a token, request one
+    // If user is authenticated but we don't have a token, they need to re-authenticate
     if (isAuthenticated) {
-      try {
-        // Create a new promise that will be resolved when we get the token
-        const tokenPromise = new Promise<string | null>((resolve, reject) => {
-          setTokenResolver({ resolve, reject });
-        });
-        
-        // Trigger the Google login flow
-        googleLogin();
-        
-        // Wait for the promise to resolve (it will be resolved in the onSuccess callback)
-        const token = await tokenPromise;
-        return token;
-      } catch (error) {
-        setError('Failed to get access token. Please try again.');
-        return null;
-      }
+      setError('Session expired. Please sign in again.');
+      return null;
     }
     
     return null;
   };
 
-  const handleGoogleLoginSuccess = (credentialResponse: any) => {
+  const handleGoogleLoginSuccess = (tokenResponse: any) => {
     try {
-      // Decode the JWT token to get user profile information
-      const decoded = jwtDecode<any>(credentialResponse.credential);
+      // Check if we have an access token from the response
+      if (tokenResponse.access_token) {
+        // Store the access token
+        setAccessToken(tokenResponse.access_token);
+        setIsGoogleApiLoaded(true);
+        setError(null);
+        
+        // For the new flow, we need to get user profile information from the Google API
+        // using the access token
+        fetchUserProfile(tokenResponse.access_token);
+      } else if (tokenResponse.credential) {
+        // Handle the old JWT credential flow (fallback)
+        const decoded = jwtDecode<any>(tokenResponse.credential);
+        
+        const userProfile: UserProfile = {
+          name: decoded.name || 'User',
+          email: decoded.email || '',
+          picture: decoded.picture || '',
+          credential: tokenResponse.credential
+        };
+        
+        setUser(userProfile);
+        setIsAuthenticated(true);
+        setError(null);
+        
+        // Don't call googleLogin() again - this was causing the double prompt
+      } else {
+        setError('Invalid authentication response');
+      }
+    } catch (error) {
+      setError('Error processing authentication response');
+    }
+  };
+
+  // New function to fetch user profile using access token
+  const fetchUserProfile = async (accessToken: string) => {
+    try {
+      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
       
-      // Create a user profile object with the decoded information
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      
+      const userInfo = await response.json();
+      
       const userProfile: UserProfile = {
-        name: decoded.name || 'User',
-        email: decoded.email || '',
-        picture: decoded.picture || '',
-        credential: credentialResponse.credential
+        name: userInfo.name || 'User',
+        email: userInfo.email || '',
+        picture: userInfo.picture || '',
+        credential: accessToken // Store the access token as credential
       };
       
       setUser(userProfile);
       setIsAuthenticated(true);
       setError(null);
-      
-      // After successful authentication, get an access token for Google Drive
-      googleLogin();
     } catch (error) {
-      setError('Error processing authentication response');
+      console.error('Error fetching user profile:', error);
+      setError('Failed to fetch user profile');
     }
   };
 

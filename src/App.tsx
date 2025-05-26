@@ -249,11 +249,6 @@ const AppContent: React.FC = () => {
     );
   };
 
-  const handleDeleteRow = (rowId: number) => {
-    // Filter out the row with the specified id
-    setData(prevData => prevData.filter(row => row.id !== rowId));
-  };
-
   const handleSave = async () => {
     if (!isInitialized) {
       setError('Google Drive not initialized. Please try again later.');
@@ -406,7 +401,6 @@ const AppContent: React.FC = () => {
             onAddColumn={handleAddColumn}
             onAddRow={handleAddRow}
             onUpdateRow={handleUpdateRow}
-            onDeleteRow={handleDeleteRow}
             onSave={handleSave}
           />
         </Container>
