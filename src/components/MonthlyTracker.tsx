@@ -28,7 +28,6 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
     boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
     transform: 'translateY(-2px)'
   },
-  marginBottom: theme.spacing(4),
   padding: theme.spacing(3),
   [theme.breakpoints.down('sm')]: {
     padding: theme.spacing(2),
@@ -74,16 +73,12 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   transition: 'background-color 0.2s ease',
 }));
 
-const HeaderBox = styled(Box)(({ theme }) => ({
+const DatePickerContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: theme.spacing(3),
-  flexWrap: 'wrap',
-  gap: theme.spacing(2),
+  justifyContent: 'flex-end',
+  marginBottom: theme.spacing(2),
   [theme.breakpoints.down('sm')]: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+    justifyContent: 'center',
   }
 }));
 
@@ -142,10 +137,7 @@ const MonthlyTracker: React.FC<MonthlyTrackerProps> = ({
 
   return (
     <StyledPaper elevation={3}>
-      <HeaderBox>
-        <Typography variant="h5" color="primary" fontWeight="600">
-          Monthly Overview - {format(selectedMonth, 'MMMM yyyy')}
-        </Typography>
+      <DatePickerContainer>
         <DatePicker
           value={selectedMonth}
           onChange={(newDate) => newDate && onMonthChange(newDate)}
@@ -157,7 +149,7 @@ const MonthlyTracker: React.FC<MonthlyTrackerProps> = ({
             } 
           }}
         />
-      </HeaderBox>
+      </DatePickerContainer>
 
       <StyledTableContainer>
         <Table sx={{ minWidth: isMobile ? undefined : 650 }} stickyHeader>
@@ -198,23 +190,23 @@ const MonthlyTracker: React.FC<MonthlyTrackerProps> = ({
                     <Typography 
                       variant="body2" 
                       sx={{ 
-                        fontWeight: 500, 
-                        color: theme.palette.text.primary
+                        fontWeight: 500,
+                        color: stat.percentage > 70 ? 'primary.main' : 'text.secondary'
                       }}
                     >
-                      {stat.completed} / {stat.total} days
+                      {`${stat.completed}/${stat.total}`}
                     </Typography>
                   </TableCell>
                 </StyledTableRow>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
-                  <Typography variant="body1" color="text.secondary">
-                    No data available for this month or no habits defined.
+              <StyledTableRow>
+                <TableCell colSpan={3} align="center">
+                  <Typography variant="body2" color="text.secondary" sx={{ py: 4 }}>
+                    No habits tracked yet. Add some habits in the Daily Tracker to see your monthly progress.
                   </Typography>
                 </TableCell>
-              </TableRow>
+              </StyledTableRow>
             )}
           </TableBody>
         </Table>

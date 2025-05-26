@@ -41,7 +41,6 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
     boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
     transform: 'translateY(-2px)'
   },
-  marginBottom: theme.spacing(4),
   padding: theme.spacing(3),
   [theme.breakpoints.down('sm')]: {
     padding: theme.spacing(2),
@@ -106,28 +105,6 @@ const AddButton = styled(Fab)(({ theme }) => ({
   }
 }));
 
-const HeaderBox = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: theme.spacing(3),
-  flexWrap: 'wrap',
-  gap: theme.spacing(2),
-  [theme.breakpoints.down('sm')]: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-  }
-}));
-
-const ButtonsContainer = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  gap: theme.spacing(1),
-  [theme.breakpoints.down('sm')]: {
-    width: '100%',
-    justifyContent: 'space-between',
-  }
-}));
-
 const StyledButton = styled(Button)(({ theme }) => ({
   borderRadius: theme.spacing(1),
   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
@@ -143,6 +120,17 @@ const ReadOnlyField = styled(TextField)(({ theme }) => ({
   },
   '& .MuiOutlinedInput-root': {
     backgroundColor: alpha(theme.palette.action.disabledBackground, 0.3),
+  }
+}));
+
+const ActionButtonsContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  gap: theme.spacing(1),
+  marginBottom: theme.spacing(2),
+  justifyContent: 'flex-end',
+  [theme.breakpoints.down('sm')]: {
+    justifyContent: 'center',
+    flexWrap: 'wrap',
   }
 }));
 
@@ -307,28 +295,23 @@ const DailyTracker: React.FC<DailyTrackerProps> = ({
 
   return (
     <StyledPaper elevation={3}>
-      <HeaderBox>
-        <Typography variant="h5" color="primary" fontWeight="600">
-          Daily Tracker
-        </Typography>
-        <ButtonsContainer>
-          <StyledButton
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setNewColumnDialog(true)}
-            size={isMobile ? "small" : "medium"}
-          >
-            Add Column
-          </StyledButton>
-          <StyledButton 
-            variant="contained" 
-            onClick={onSave}
-            size={isMobile ? "small" : "medium"}
-          >
-            Save
-          </StyledButton>
-        </ButtonsContainer>
-      </HeaderBox>
+      <ActionButtonsContainer>
+        <StyledButton
+          variant="outlined"
+          startIcon={<AddIcon />}
+          onClick={() => setNewColumnDialog(true)}
+          size={isMobile ? "small" : "medium"}
+        >
+          Add Column
+        </StyledButton>
+        <StyledButton 
+          variant="contained" 
+          onClick={onSave}
+          size={isMobile ? "small" : "medium"}
+        >
+          Save
+        </StyledButton>
+      </ActionButtonsContainer>
 
       <StyledTableContainer>
         <Table sx={{ minWidth: isMobile ? undefined : 650 }} stickyHeader>

@@ -20,7 +20,11 @@ import LoginPage from './components/LoginPage';
 import Header from './components/Header';
 import DailyTracker from './components/DailyTracker';
 import MonthlyTracker from './components/MonthlyTracker';
+import CollapsibleSection from './components/CollapsibleSection';
 import { useGoogleDrive } from './hooks/useGoogleDrive';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import { format } from 'date-fns';
 
 // Import or define the TrackerRow interface to match DailyTracker component
 interface TrackerRow {
@@ -389,20 +393,33 @@ const AppContent: React.FC = () => {
             px: { xs: 2, sm: 3 }
           }}
         >
-          <MonthlyTracker 
-            data={data} 
-            customColumns={customColumns} 
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-          />
-          <DailyTracker
-            data={data}
-            customColumns={customColumns}
-            onAddColumn={handleAddColumn}
-            onAddRow={handleAddRow}
-            onUpdateRow={handleUpdateRow}
-            onSave={handleSave}
-          />
+          <CollapsibleSection
+            title={`Monthly Overview - ${format(selectedMonth, 'MMMM yyyy')}`}
+            icon={<CalendarTodayIcon />}
+            defaultExpanded={true}
+          >
+            <MonthlyTracker 
+              data={data} 
+              customColumns={customColumns} 
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Daily Tracker"
+            icon={<AssignmentIcon />}
+            defaultExpanded={false}
+          >
+            <DailyTracker
+              data={data}
+              customColumns={customColumns}
+              onAddColumn={handleAddColumn}
+              onAddRow={handleAddRow}
+              onUpdateRow={handleUpdateRow}
+              onSave={handleSave}
+            />
+          </CollapsibleSection>
         </Container>
       </LocalizationProvider>
     </ThemeProvider>
