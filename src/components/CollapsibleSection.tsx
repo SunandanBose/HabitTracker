@@ -6,7 +6,6 @@ import {
   Collapse,
   Paper,
   styled,
-  useTheme,
   alpha
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -72,7 +71,6 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   icon
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const theme = useTheme();
 
   const handleToggle = () => {
     setExpanded(!expanded);

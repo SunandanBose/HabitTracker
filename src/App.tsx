@@ -21,6 +21,7 @@ import Header from './components/Header';
 import DailyTracker from './components/DailyTracker';
 import MonthlyTracker from './components/MonthlyTracker';
 import CollapsibleSection from './components/CollapsibleSection';
+import StartNewHabitButton from './components/StartNewHabitButton';
 import { useGoogleDrive } from './hooks/useGoogleDrive';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -36,9 +37,6 @@ interface TrackerRow {
   comment: string;
   [key: string]: any; // This allows dynamic column names
 }
-
-// Check if we're in development mode
-const isDevelopment = process.env.NODE_ENV === 'development';
 
 // Create a theme instance.
 let theme = createTheme({
@@ -136,7 +134,7 @@ let theme = createTheme({
 theme = responsiveFontSizes(theme);
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, user, signOut } = useAuth();
+  const { isAuthenticated, signOut } = useAuth();
   const { 
     googleDriveService, 
     isInitialized, 
@@ -253,12 +251,49 @@ const AppContent: React.FC = () => {
     );
   };
 
-  const handleSave = async () => {
+  const handleDeleteHabit = async (habitName: string) => {
     if (!isInitialized) {
       setError('Google Drive not initialized. Please try again later.');
       return;
     }
     
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Remove the habit from custom columns
+      const updatedCustomColumns = customColumns.filter(col => col !== habitName);
+      setCustomColumns(updatedCustomColumns);
+      
+      // Remove the habit from all data entries
+      const updatedData = data.map(row => {
+        const { [habitName]: removed, ...rest } = row;
+        return rest as TrackerRow;
+      });
+      setData(updatedData);
+      
+      // Save to Google Drive
+      await googleDriveService.updateFileContent(fileId, {
+        dailyTracker: updatedData,
+        monthlyTracker: [],
+        customColumns: updatedCustomColumns,
+      });
+    } catch (error: any) {
+      setError(`Failed to delete habit: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    console.log('App: handleSave called');
+    if (!isInitialized) {
+      console.log('App: Google Drive not initialized');
+      setError('Google Drive not initialized. Please try again later.');
+      return;
+    }
+    
+    console.log('App: Starting save process, data length:', data.length);
     setIsLoading(true);
     setError(null);
     
@@ -269,12 +304,15 @@ const AppContent: React.FC = () => {
         slNo: row.slNo || index + 1 // Fallback to index+1 if slNo is missing
       }));
       
+      console.log('App: Saving data to Google Drive, fileId:', fileId);
       await googleDriveService.updateFileContent(fileId, {
         dailyTracker: dataToSave,
         monthlyTracker: [], // This will be calculated in the MonthlyTracker component
         customColumns,
       });
+      console.log('App: Save completed successfully');
     } catch (error: any) {
+      console.error('App: Failed to save data:', error);
       setError(`Failed to save data: ${error.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
@@ -403,6 +441,10 @@ const AppContent: React.FC = () => {
               customColumns={customColumns} 
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
+              onUpdateRow={handleUpdateRow}
+              onAddRow={handleAddRow}
+              onDeleteHabit={handleDeleteHabit}
+              onSave={handleSave}
             />
           </CollapsibleSection>
 
@@ -420,6 +462,8 @@ const AppContent: React.FC = () => {
               onSave={handleSave}
             />
           </CollapsibleSection>
+
+          <StartNewHabitButton onAddHabit={handleAddColumn} />
         </Container>
       </LocalizationProvider>
     </ThemeProvider>
