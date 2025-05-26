@@ -24,9 +24,12 @@ import CollapsibleSection from './components/CollapsibleSection';
 import StartNewHabitButton from './components/StartNewHabitButton';
 import PWAInstallButton from './components/PWAInstallButton';
 import OfflineIndicator from './components/OfflineIndicator';
+import NotificationSettings from './components/NotificationSettings';
 import { useGoogleDrive } from './hooks/useGoogleDrive';
+import { notificationService } from './services/notificationService';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import { format } from 'date-fns';
 
 // Import or define the TrackerRow interface to match DailyTracker component
@@ -152,6 +155,14 @@ const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFallbackButton, setShowFallbackButton] = useState(false);
+
+  // Initialize notification service when app loads
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Initialize notifications when user is authenticated
+      notificationService.onAppActive();
+    }
+  }, [isAuthenticated]);
 
   // Define loadUserData before any useEffect that depends on it
   const loadUserData = useCallback(async () => {
@@ -527,6 +538,14 @@ const AppContent: React.FC = () => {
               onUpdateRow={handleUpdateRow}
               onSave={handleSave}
             />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Notification Settings"
+            icon={<NotificationsIcon />}
+            defaultExpanded={false}
+          >
+            <NotificationSettings />
           </CollapsibleSection>
 
           <StartNewHabitButton onAddHabit={handleAddColumn} />

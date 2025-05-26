@@ -306,38 +306,6 @@ async function clearPendingSyncData() {
   console.log('Service Worker: Clearing pending sync data');
 }
 
-// Push notifications (for future habit reminders)
-self.addEventListener('push', (event) => {
-  console.log('Service Worker: Push notification received');
-  
-  const options = {
-    body: event.data ? event.data.text() : 'Don\'t forget to track your habits today!',
-    icon: '/logo192.png',
-    badge: '/logo192.png',
-    vibrate: [100, 50, 100],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 1
-    },
-    actions: [
-      {
-        action: 'open',
-        title: 'Open Habit Tracker',
-        icon: '/logo192.png'
-      },
-      {
-        action: 'close',
-        title: 'Close',
-        icon: '/logo192.png'
-      }
-    ]
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification('Habit Tracker', options)
-  );
-});
-
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   console.log('Service Worker: Notification clicked');
@@ -348,5 +316,141 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(
       clients.openWindow('/')
     );
+  } else {
+    // Default action - open the app
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true })
+        .then((clientList) => {
+          // Check if app is already open
+          for (const client of clientList) {
+            if (client.url.includes(self.location.origin) && 'focus' in client) {
+              return client.focus();
+            }
+          }
+          // If app is not open, open it
+          if (clients.openWindow) {
+            return clients.openWindow('/');
+          }
+        })
+    );
+  }
+});
+
+// Handle messages from the main app
+self.addEventListener('message', (event) => {
+  console.log('Service Worker: Message received:', event.data);
+  
+  if (event.data && event.data.type === 'NOTIFICATION_CLICKED') {
+    // Handle notification click actions
+    if (event.data.action === 'open_app') {
+      event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+          .then((clientList) => {
+            for (const client of clientList) {
+              if (client.url.includes(self.location.origin) && 'focus' in client) {
+                return client.focus();
+              }
+            }
+            if (clients.openWindow) {
+              return clients.openWindow('/');
+            }
+          })
+      );
+    }
+  }
+  
+  if (event.data && event.data.type === 'SCHEDULE_NOTIFICATION') {
+    // Handle notification scheduling from the app
+    const { title, body, delay } = event.data;
+    setTimeout(() => {
+      self.registration.showNotification(title || 'Habit Tracker', {
+        body: body || "Don't forget to track your habits today! 🎯",
+        icon: '/HTlogo.png',
+        badge: '/HTlogo.png',
+        tag: 'scheduled-reminder',
+        requireInteraction: false,
+        silent: false,
+        timestamp: Date.now(),
+        actions: [
+          {
+            action: 'open',
+            title: 'Open App',
+            icon: '/HTlogo.png'
+          },
+          {
+            action: 'dismiss',
+            title: 'Dismiss',
+            icon: '/HTlogo.png'
+          }
+        ]
+      });
+    }, delay || 0);
+  }
+});
+
+// Enhanced push notification handling
+self.addEventListener('push', (event) => {
+  console.log('Service Worker: Push notification received');
+  
+  let notificationData = {
+    title: 'Habit Tracker',
+    body: "Don't forget to track your habits today! 🎯",
+    icon: '/HTlogo.png',
+    badge: '/HTlogo.png',
+    tag: 'habit-reminder'
+  };
+
+  // Parse push data if available
+  if (event.data) {
+    try {
+      const pushData = event.data.json();
+      notificationData = { ...notificationData, ...pushData };
+    } catch (error) {
+      console.log('Push data is not JSON, using text:', event.data.text());
+      notificationData.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: notificationData.body,
+    icon: notificationData.icon,
+    badge: notificationData.badge,
+    vibrate: [100, 50, 100],
+    data: {
+      dateOfArrival: Date.now(),
+      primaryKey: 1,
+      url: '/'
+    },
+    actions: [
+      {
+        action: 'open',
+        title: 'Open Habit Tracker',
+        icon: '/HTlogo.png'
+      },
+      {
+        action: 'dismiss',
+        title: 'Dismiss',
+        icon: '/HTlogo.png'
+      }
+    ],
+    tag: notificationData.tag,
+    requireInteraction: false,
+    silent: false,
+    timestamp: Date.now()
+  };
+  
+  event.waitUntil(
+    self.registration.showNotification(notificationData.title, options)
+  );
+});
+
+// Handle notification close events
+self.addEventListener('notificationclose', (event) => {
+  console.log('Service Worker: Notification closed');
+  
+  // Track notification dismissal if needed
+  if (event.notification.tag === 'daily-reminder') {
+    // Could send analytics or update user preferences
+    console.log('Daily reminder notification was dismissed');
   }
 }); 

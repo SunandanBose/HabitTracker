@@ -4,6 +4,7 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
+import { notificationService } from './services/notificationService';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -19,6 +20,9 @@ serviceWorkerRegistration.register({
   onSuccess: (registration) => {
     console.log('PWA: Service worker registered successfully');
     console.log('PWA: App is ready for offline use');
+    
+    // Initialize notification service after service worker is ready
+    notificationService.onAppActive();
   },
   onUpdate: (registration) => {
     console.log('PWA: New content is available');
@@ -35,6 +39,20 @@ serviceWorkerRegistration.register({
     console.log('PWA: New content available, please refresh');
     // You could show a persistent notification here
   }
+});
+
+// Handle app visibility changes for notification service
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    notificationService.onAppInactive();
+  } else {
+    notificationService.onAppActive();
+  }
+});
+
+// Handle page unload
+window.addEventListener('beforeunload', () => {
+  notificationService.onAppInactive();
 });
 
 // If you want to start measuring performance in your app, pass a function
