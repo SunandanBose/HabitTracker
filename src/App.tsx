@@ -134,7 +134,7 @@ let theme = createTheme({
 theme = responsiveFontSizes(theme);
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, signOut } = useAuth();
+  const { isAuthenticated, signOut, clearCookiesAndRefresh } = useAuth();
   const { 
     googleDriveService, 
     isInitialized, 
@@ -149,6 +149,7 @@ const AppContent: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFallbackButton, setShowFallbackButton] = useState(false);
 
   // Define loadUserData before any useEffect that depends on it
   const loadUserData = useCallback(async () => {
@@ -212,9 +213,35 @@ const AppContent: React.FC = () => {
     };
   }, [isDriveLoading, initializeGoogleDrive]);
 
+  // Add timeout for fallback button (30 seconds)
+  useEffect(() => {
+    let fallbackTimeoutId: NodeJS.Timeout | null = null;
+    
+    // Show fallback button after 30 seconds of loading
+    if ((isLoading || isDriveLoading) && isAuthenticated) {
+      fallbackTimeoutId = setTimeout(() => {
+        setShowFallbackButton(true);
+      }, 30000); // 30 seconds
+    } else {
+      // Reset fallback button when not loading
+      setShowFallbackButton(false);
+    }
+    
+    return () => {
+      if (fallbackTimeoutId) {
+        clearTimeout(fallbackTimeoutId);
+      }
+    };
+  }, [isLoading, isDriveLoading, isAuthenticated]);
+
   const handleRetry = () => {
     setError(null);
+    setShowFallbackButton(false);
     initializeGoogleDrive();
+  };
+
+  const handleFallbackAction = () => {
+    clearCookiesAndRefresh();
   };
 
   const handleAddColumn = (columnName: string) => {
@@ -333,8 +360,45 @@ const AppContent: React.FC = () => {
         justifyContent: 'center', 
         alignItems: 'center', 
         height: '100vh',
-        background: alpha(theme.palette.primary.light, 0.05)
+        background: alpha(theme.palette.primary.light, 0.05),
+        position: 'relative'
       }}>
+        {showFallbackButton && (
+          <Box sx={{ 
+            position: 'absolute',
+            top: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000
+          }}>
+            <Alert 
+              severity="warning" 
+              sx={{ 
+                mb: 2,
+                borderRadius: 2,
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+              }}
+              action={
+                <Button 
+                  color="inherit" 
+                  size="small" 
+                  onClick={handleFallbackAction}
+                  variant="outlined"
+                  sx={{ 
+                    borderColor: 'currentColor',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.warning.main, 0.1)
+                    }
+                  }}
+                >
+                  Clear Cookies & Refresh
+                </Button>
+              }
+            >
+              Taking longer than usual? Try clearing cookies and refreshing.
+            </Alert>
+          </Box>
+        )}
         <CircularProgress sx={{ mb: 2, color: theme.palette.primary.main }} />
         <Typography variant="h6" color="primary.main">
           {isDriveLoading ? 'Initializing Google Drive...' : 'Loading your data...'}

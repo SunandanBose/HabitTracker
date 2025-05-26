@@ -6,7 +6,7 @@ import Cookies from 'js-cookie';
 
 // Cookie configuration
 const COOKIE_OPTIONS = {
-  expires: 2/24, // 2 hours in days (1/12 of a day)
+  expires: 30, // 30 days (1 month)
   secure: process.env.NODE_ENV === 'production', // Secure in production
   sameSite: 'strict' as const
 };
@@ -39,6 +39,7 @@ interface AuthContextType {
   isGoogleApiLoaded: boolean;
   getAccessToken: () => Promise<string | null>;
   error: string | null;
+  clearCookiesAndRefresh: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -187,6 +188,22 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
     window.open('https://drive.google.com', '_blank');
   };
 
+  const clearCookiesAndRefresh = () => {
+    // Clear state
+    setUser(null);
+    setIsAuthenticated(false);
+    setIsGoogleApiLoaded(false);
+    setAccessToken(null);
+    setError(null);
+    
+    // Clear all auth cookies
+    Cookies.remove(USER_COOKIE);
+    Cookies.remove(TOKEN_COOKIE);
+    
+    // Reload the page to ensure all state is cleared
+    window.location.reload();
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -198,6 +215,7 @@ const AuthProviderInner: React.FC<{ children: React.ReactNode }> = ({ children }
         isGoogleApiLoaded,
         getAccessToken,
         error,
+        clearCookiesAndRefresh,
       }}
     >
       {children}
